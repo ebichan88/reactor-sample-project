@@ -2,7 +2,7 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.7.0'
 }
 
-rootProject.name = 'reactor-kitchen'
-include('app')
+rootProject.name = 'reactor-sample-project'
+include('reactor-kitchen')
 include('thread-demo')
 include('reactor-demo')
