@@ -196,9 +196,8 @@ class ReactorPlaygroundTest {
     @DisplayName("onErrorMap: 発生したエラーを IllegalStateException に変換する")
     void testOnErrorMap() {
         StepVerifier.create(playground.demoOnErrorMap())
-                .expectErrorMatches(e -> e instanceof IllegalStateException
-                        && "mapped: original".equals(e.getMessage()))
-                .verify();
+                .verifyErrorMatches(e -> e instanceof IllegalStateException
+                        && "mapped: original".equals(e.getMessage()));
     }
 
     @Test
