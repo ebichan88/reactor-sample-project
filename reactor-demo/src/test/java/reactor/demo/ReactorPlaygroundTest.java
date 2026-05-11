@@ -227,4 +227,16 @@ class ReactorPlaygroundTest {
                 .expectNext(10, 20, 30)
                 .verifyComplete();
     }
+
+    // =====================================================================
+    // Context 系 Operator
+    // =====================================================================
+
+    @Test
+    @DisplayName("deferContextual / contextWrite: Context から requestId を取得して文字列を生成する")
+    void testContext() {
+        StepVerifier.create(playground.demoContex2())
+                .expectNext("requestId = req-123")
+                .verifyComplete();
+    }
 }

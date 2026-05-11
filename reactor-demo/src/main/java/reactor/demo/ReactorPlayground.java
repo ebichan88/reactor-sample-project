@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.context.Context;
 import reactor.util.retry.Retry;
 
 public class ReactorPlayground {
@@ -353,5 +354,64 @@ public class ReactorPlayground {
                 .doOnNext(i -> System.out.println("before map: " + i)) // map 前の値を覗く（値は変わらない）
                 .map(i -> i * 10)
                 .doOnNext(i -> System.out.println("after  map: " + i)); // map 後の値を覗く（値は変わらない）
+    }
+
+    // =====================================================================
+    // Context 系 Operator
+    // =====================================================================
+
+    public void demoContext() {
+        Mono.deferContextual(contextView -> {
+            String requestId = contextView.get("requestId");
+            return Mono.just("requestId = " + requestId);
+        }).contextWrite(Context.of("requestId", "req-123"))
+                .subscribe(System.out::println);
+    }
+
+    /**
+     * 【Operator】deferContextual / contextWrite: Context を使ってスコープ付きのデータを伝播する。
+     *
+     * <p>
+     * <b>Context の伝播方向について：</b><br>
+     * Reactor の Context はチェーンを「下流 → 上流」方向へ伝播する。
+     * つまり {@code subscribe()} が呼ばれると、まず下流にある {@code contextWrite} が評価されて
+     * Context に値が書き込まれ、その Context が上流へ向けて伝わる。
+     * そのため、コード上では {@code contextWrite} が {@code deferContextual} より
+     * 後（下）に書かれていても、subscribe 時には上流の {@code deferContextual} に
+     * 届いている。
+     *
+     * <p>
+     * <b>deferContextual が正しく動く理由：</b><br>
+     * {@code deferContextual} のラムダは subscribe 時に実行される（遅延評価）。
+     * subscribe が起きた瞬間には既に {@code contextWrite} による書き込みが完了しているため、
+     * ラムダの中で {@code contextView.get("requestId")} を呼び出すと
+     * 確実に値を取得できる。
+     *
+     * <p>
+     * 処理の流れ（subscribe 時）:
+     * <ol>
+     * <li>{@code contextWrite} が評価され Context に "requestId" = "req-123" が書き込まれる
+     * <li>Context が上流へ伝播する
+     * <li>{@code deferContextual} のラムダが実行され、Context から "requestId" を取得する
+     * </ol>
+     *
+     * - {@code contextWrite}: 下流から上流へ伝播する Key-Value ストアに値を書き込む。
+     * - {@code deferContextual}: 購読時に Context を読み取って Mono を生成する（遅延評価）。
+     * 【入力】Context に "requestId" = "req-123" を設定
+     * 【出力】"requestId = req-123"
+     */
+    public Mono<String> demoContex2() {
+        // ※ contextWrite が deferContextual より後（下）に書かれているが、
+        // Context は「下流 → 上流」へ伝播するため、subscribe 時には
+        // deferContextual のラムダが実行される前に contextWrite の値がセット済みになる。
+        return Mono.deferContextual(contextView -> {
+            // ラムダは subscribe 時に実行される（遅延評価）。
+            // この時点では既に下流の contextWrite が評価済みなので、値を取得できる。
+            String requestId = contextView.get("requestId");
+            return Mono.just("requestId = " + requestId);
+        })
+                // Context に "requestId" を書き込む。
+                // コード上は下にあるが、subscribe 時に最初に評価され、Context を上流へ伝播させる。
+                .contextWrite(Context.of("requestId", "req-123"));
     }
 }
