@@ -157,10 +157,12 @@ class ReactorPlaygroundTest {
     @Test
     @DisplayName("delayElements: 各要素を 1 秒遅延して流す")
     void testDelayElements() {
-        // 仮想時間で 3 秒進めて各要素が順に発行されることを検証
+        // 仮想時間を 1 秒ずつ進めて、各要素が 1 秒ごとに発行されることを検証
         StepVerifier.withVirtualTime(playground::demoDelayElements)
-                .thenAwait(Duration.ofSeconds(3))
-                .expectNext(1, 2, 3)
+                .expectSubscription()
+                .expectNoEvent(Duration.ofSeconds(1)).expectNext(1)
+                .expectNoEvent(Duration.ofSeconds(1)).expectNext(2)
+                .expectNoEvent(Duration.ofSeconds(1)).expectNext(3)
                 .verifyComplete();
     }
 
