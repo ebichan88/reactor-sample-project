@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -151,7 +152,7 @@ class ReactorPlaygroundTest {
     }
 
     // =====================================================================
-    // 時間・非同期制御系 Operator
+    // 時間制御系 Operator
     // =====================================================================
 
     @Test
@@ -163,14 +164,6 @@ class ReactorPlaygroundTest {
                 .expectNoEvent(Duration.ofSeconds(1)).expectNext(1)
                 .expectNoEvent(Duration.ofSeconds(1)).expectNext(2)
                 .expectNoEvent(Duration.ofSeconds(1)).expectNext(3)
-                .verifyComplete();
-    }
-
-    @Test
-    @DisplayName("subscribeOn: boundedElastic スケジューラで全要素を流す")
-    void testSubscribeOn() {
-        StepVerifier.create(playground.demoSubscribeOn())
-                .expectNext("a", "b", "c")
                 .verifyComplete();
     }
 
@@ -228,6 +221,52 @@ class ReactorPlaygroundTest {
         StepVerifier.create(playground.demoDoOnNext())
                 .expectNext(10, 20, 30)
                 .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("log: シグナルをログに出力しても、take(3) により先頭 3 件だけ流れる")
+    void testLog() {
+        StepVerifier.create(playground.demoLog())
+                .expectNext(1, 2, 3)
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("checkpoint: エラーのスタックトレースに checkpoint の目印が追加される")
+    void testCheckpoint() {
+        StepVerifier.create(playground.demoCheckpoint())
+                .expectErrorSatisfies(e -> {
+                    assertTrue(e instanceof IndexOutOfBoundsException);
+                    // checkpoint の目印は、例外の suppressed に追加される
+                    assertTrue(Arrays.stream(e.getSuppressed())
+                            .anyMatch(s -> s.getMessage().contains("demoCheckpoint: single の直後")));
+                })
+                .verify();
+    }
+
+    // =====================================================================
+    // Scheduler（実行スレッドの切り替え）
+    // =====================================================================
+
+    @Test
+    @DisplayName("defaultThread: subscribe を呼び出したスレッドで処理が実行される")
+    void testDefaultThread() throws InterruptedException {
+        // demoDefaultThread() 自体を呼び出して例外なく動作することを確認
+        playground.demoDefaultThread();
+    }
+
+    @Test
+    @DisplayName("publishOn: publishOn より後ろの Operator が single スレッドで実行される")
+    void testPublishOn() {
+        // demoPublishOn() 自体を呼び出して例外なく動作することを確認
+        playground.demoPublishOn();
+    }
+
+    @Test
+    @DisplayName("subscribeOn: 購読処理から boundedElastic スレッドで実行される")
+    void testSubscribeOn() {
+        // demoSubscribeOn() 自体を呼び出して例外なく動作することを確認
+        playground.demoSubscribeOn();
     }
 
     // =====================================================================

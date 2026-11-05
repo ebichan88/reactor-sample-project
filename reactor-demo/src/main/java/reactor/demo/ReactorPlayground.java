@@ -239,7 +239,7 @@ public class ReactorPlayground {
     }
 
     // =====================================================================
-    // 時間・非同期制御系 Operator
+    // 時間制御系 Operator
     // =====================================================================
 
     /**
@@ -250,16 +250,6 @@ public class ReactorPlayground {
     public Flux<Integer> demoDelayElements() {
         return Flux.range(1, 3)
                 .delayElements(Duration.ofSeconds(1));
-    }
-
-    /**
-     * 【Operator】subscribeOn: 購読処理（upstream の実行）を指定スケジューラのスレッドで行う。
-     * 【入力】Flux.just("a", "b", "c")
-     * 【出力】"a", "b", "c"（boundedElastic スケジューラのスレッドで処理）
-     */
-    public Flux<String> demoSubscribeOn() {
-        return Flux.just("a", "b", "c")
-                .subscribeOn(Schedulers.boundedElastic());
     }
 
     // =====================================================================
@@ -354,6 +344,67 @@ public class ReactorPlayground {
                 .doOnNext(i -> System.out.println("before map: " + i)) // map 前の値を覗く（値は変わらない）
                 .map(i -> i * 10)
                 .doOnNext(i -> System.out.println("after  map: " + i)); // map 後の値を覗く（値は変わらない）
+    }
+
+    /**
+     * 【Operator】log: 上流から流れてくるシグナル（onSubscribe / request / onNext / onComplete / cancel 等）をログに出力する。
+     * 【入力】Flux.range(1, 10) → 1, 2, ..., 10
+     * 【出力】1, 2, 3（take(3) によって先頭 3 件を取得）
+     */
+    public Flux<Integer> demoLog() {
+        return Flux.range(1, 10)
+                .log() // range から流れてくるシグナルをログに出力する
+                .take(3);
+    }
+
+    /**
+     * 【Operator】checkpoint: エラー発生時のスタックトレースに、指定した目印を追加する。
+     * 【入力】Flux.range(1, 3) → 1, 2, 3
+     * 【出力】IndexOutOfBoundsException（single は要素が 1 件であることを期待するため、エラーとなる）
+     */
+    public Mono<Integer> demoCheckpoint() {
+        return Flux.range(1, 3)
+                .single() // 要素が 2 件以上あるため IndexOutOfBoundsException が発生する
+                .checkpoint("demoCheckpoint: single の直後");
+    }
+
+    // =====================================================================
+    // Scheduler（実行スレッドの切り替え）
+    // =====================================================================
+
+    /**
+     * Reactor の処理が subscribe を呼び出したスレッドで実行されることを確認する。
+     */
+    public void demoDefaultThread() throws InterruptedException {
+        // 「定義」は main スレッドで行う
+        Flux<Integer> flux = Flux.range(1, 3)
+                .doOnNext(i -> System.out.printf("[%s] doOnNext: %d%n", Thread.currentThread().getName(), i));
+        // 「実行」は subscribe を呼び出したスレッド（my-thread）で行われる
+        Thread thread = new Thread(() -> flux.subscribe(), "my-thread");
+        thread.start();
+        thread.join();
+    }
+
+    /**
+     * 【Operator】publishOn: publishOn より後ろ（下流）の Operator を、指定した Scheduler のスレッドで実行する。
+     */
+    public void demoPublishOn() {
+        Flux.range(1, 3)
+                .doOnNext(i -> System.out.printf("[%s] publishOn前: %d%n", Thread.currentThread().getName(), i))
+                .publishOn(Schedulers.single()) // 以降の Operator を single スレッドで実行する
+                .doOnNext(i -> System.out.printf("[%s] publishOn後: %d%n", Thread.currentThread().getName(), i))
+                .blockLast(); // サンプルのため、全ての要素が処理されるまで待機する
+    }
+
+    /**
+     * 【Operator】subscribeOn: 購読処理を、指定した Scheduler のスレッドで実行する。
+     */
+    public void demoSubscribeOn() {
+        Flux.range(1, 3)
+                .doOnNext(i -> System.out.printf("[%s] subscribeOn前: %d%n", Thread.currentThread().getName(), i))
+                .subscribeOn(Schedulers.boundedElastic()) // 購読処理を boundedElastic スレッドで実行する
+                .doOnNext(i -> System.out.printf("[%s] subscribeOn後: %d%n", Thread.currentThread().getName(), i))
+                .blockLast(); // サンプルのため、全ての要素が処理されるまで待機する
     }
 
     // =====================================================================
